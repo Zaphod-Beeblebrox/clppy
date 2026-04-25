@@ -85,4 +85,42 @@ public class ClipRepository : IClipRepository
             .Where(c => c.Pinned == true && c.DeletedAt == null)
             .ToListAsync();
     }
+
+    public async Task UpdateClipPositionAsync(Guid clipId, int? row, int? col)
+    {
+        var clip = await _context.Clips.FindAsync(clipId);
+        if (clip != null)
+        {
+            var settings = await GetSettingsAsync();
+            var inHistoryZone = row.HasValue && col.HasValue && 
+                               row.Value < settings.HistoryRows && 
+                               col.Value < settings.HistoryCols;
+
+            clip.Row = row;
+            clip.Col = col;
+            clip.Pinned = !inHistoryZone;
+            
+            if (clip.Pinned)
+            {
+                clip.HistoryIndex = null;
+            }
+            else
+            {
+                // Reassign history indices for all unpinned clips
+                var historyClips = await _context.Clips
+                    .Where(c => c.Pinned == false && c.DeletedAt == null)
+                    .OrderBy(c => c.CreatedAt)
+                    .ToListAsync();
+                
+                for (int i = 0; i < historyClips.Count; i++)
+                {
+                    historyClips[i].HistoryIndex = i;
+                }
+            }
+
+            clip.UpdatedAt = DateTime.UtcNow;
+            _context.Clips.Update(clip);
+            await _context.SaveChangesAsync();
+        }
+    }
 }

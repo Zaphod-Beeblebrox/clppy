@@ -2,11 +2,11 @@ using System.Threading.Tasks;
 using Clppy.Core.Models;
 using Clppy.Core.Persistence;
 
-namespace Clppy.Core.Configuration;
+namespace Clppy.Core.Settings;
 
 public interface ISettingsService
 {
-    Settings Current { get; }
+    Models.Settings Current { get; }
     Task LoadAsync();
     Task SaveAsync();
     int HistoryZoneRowCount => Current.HistoryRows;

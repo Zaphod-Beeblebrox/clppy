@@ -13,4 +13,5 @@ public interface IClipRepository
     Task SaveSettingsAsync(Models.Settings settings);
     Task<IEnumerable<Clip>> GetHistoryZoneAsync(int maxRows, int maxCols);
     Task<IEnumerable<Clip>> GetPinnedClipsAsync();
+    Task UpdateClipPositionAsync(Guid clipId, int? row, int? col);
 }

@@ -152,7 +152,7 @@ public class PersistenceTests
         using var context = new ClppyDbContext(_options);
         var repository = new ClipRepository(context);
 
-        var settings = new Settings
+        var settings = new Models.Settings
         {
             HistoryRows = 10,
             HistoryCols = 15,

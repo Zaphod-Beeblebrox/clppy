@@ -2,19 +2,19 @@ using System.Threading.Tasks;
 using Clppy.Core.Models;
 using Clppy.Core.Persistence;
 
-namespace Clppy.Core.Configuration;
+namespace Clppy.Core.Settings;
 
 public class SettingsService : ISettingsService
 {
     private readonly IClipRepository _clipRepository;
-    private Settings _current;
+    private Models.Settings _current;
 
-    public Settings Current => _current;
+    public Models.Settings Current => _current;
 
     public SettingsService(IClipRepository clipRepository)
     {
         _clipRepository = clipRepository;
-        _current = new Settings();
+        _current = new Models.Settings();
     }
 
     public async Task LoadAsync()

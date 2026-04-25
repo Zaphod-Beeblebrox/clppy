@@ -11,7 +11,7 @@ public class ClipTests
     {
         var clip = new Clip();
 
-        Assert.Equal(false, clip.Pinned);
+        Assert.False(clip.Pinned);
         Assert.Null(clip.DeletedAt);
         Assert.Equal(PasteMethod.Direct, clip.Method);
     }
@@ -28,7 +28,7 @@ public class ClipTests
     [Fact]
     public void Settings_Default_Values_Match_Spec()
     {
-        var settings = new Settings();
+        var settings = new Models.Settings();
 
         Assert.Equal(5, settings.HistoryRows);
         Assert.Equal(4, settings.HistoryCols);
