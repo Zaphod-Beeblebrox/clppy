@@ -1,0 +1,56 @@
+# .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+[Xx]64/
+[Xx]86/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.swp
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Compiled artifacts
+*.dll
+*.exe
+*.pdb
+*.lib
+*.obj
+
+# Local databases (used during dev)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.bak
+
+# Environment / secrets
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
