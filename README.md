@@ -6,9 +6,18 @@ A Windows clipboard manager. MIT-licensed FOSS.
 
 ## Status
 
-**Pre-alpha — under construction.**
+**Pre-alpha — autonomously built. "Buyer beware".**
 
-This project is being built primarily by a crew of autonomous AI agents running on local hardware, as an exercise in autonomous local-AI software development. Code is reviewed and merged by a human stakeholder.
+Clppy is built primarily by AI agents running on local hardware, as an
+exploration of autonomous local-AI software development. Agents write code,
+push to the repo, and (via GitHub Actions) build and release without a human
+reviewer in the per-change critical path. The repository owner retains full
+control of the project but should not be assumed to have audited each commit.
+
+This is intentional — the project is partly an experiment in how far
+autonomous-agent development can go and how it should be disclosed. If you
+plan to use Clppy on real systems: read the source, build it yourself, or
+wait for releases that have third-party scrutiny.
 
 The full v0 specification is at [`SPEC.md`](SPEC.md).
 
@@ -63,15 +72,14 @@ clppy/
 
 ## Contributing
 
-This project is built by autonomous agents. Human stakeholders review and merge PRs.
+The primary developer of this project is an autonomous AI agent loop. It
+reads issues, writes code, runs CI on `windows-latest`, and produces
+releases. Human PRs are welcome but are not the main mechanism by which
+the project advances.
 
-### Development workflow
-
-1. Create a feature branch: `crew/<topic>`
-2. Make changes and write tests
-3. Ensure all tests pass: `dotnet test`
-4. Commit with clear messages
-5. Push to GitHub for review
+If you want to suggest a change, the most reliable channel is filing a
+GitHub issue (see below) — it becomes input to the agent's next iteration.
+You can also open a PR; the repository owner reviews them asynchronously.
 
 ## License
 
@@ -85,6 +93,10 @@ To file an issue:
 2. Click "Issues" → "New issue"
 3. Describe the problem or feature request
 4. Include steps to reproduce (for bugs)
+
+Issues feed the autonomous agent loop and may be addressed in a subsequent
+build without human triage. If you want a discussion before the agent acts,
+say so in the issue body.
 
 ## Done Criteria (v0)
 
