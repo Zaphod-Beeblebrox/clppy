@@ -1,16 +1,19 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
 using Clppy.Core.Clipboard;
+using Clppy.Core.Hotkeys;
 using Clppy.Core.Models;
 using Clppy.Core.Paste;
 using Clppy.Core.Persistence;
 using Clppy.Core.Settings;
+using Models = Clppy.Core.Models;
 
 namespace Clppy.App;
 
