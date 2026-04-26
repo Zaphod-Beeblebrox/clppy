@@ -243,10 +243,10 @@ public partial class MainWindow : Window
                 Width = 300,
                 Height = 150,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Content = new StackPanel { Margin = 10, Children = {
+                Content = new StackPanel { Margin = new Thickness(10), Children = {
                     new TextBox { Name = "RenameTextBox", Margin = new Thickness(0,0,0,10), Text = clip.Label ?? "" },
                     new Button { Content = "OK", Width = 70, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,10,0,0) }
-                }};
+                }}
             };
             dialog.Loaded += (s2, e2) => ((TextBox)dialog.FindName("RenameTextBox")).Focus();
             if (dialog.ShowDialog() == true)
