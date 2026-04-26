@@ -28,6 +28,15 @@ public class ClipRepository : IClipRepository
 
     public async Task<Clip> AddAsync(Clip clip)
     {
+        // Set HistoryIndex for new unpinned clips
+        if (!clip.Pinned && clip.HistoryIndex == null)
+        {
+            var existingHistoryCount = await _context.Clips
+                .Where(c => c.Pinned == false && c.DeletedAt == null)
+                .CountAsync();
+            clip.HistoryIndex = existingHistoryCount;
+        }
+
         _context.Clips.Add(clip);
         await _context.SaveChangesAsync();
         return clip;
