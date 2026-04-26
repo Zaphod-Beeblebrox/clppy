@@ -52,6 +52,7 @@ public partial class MainWindow : Window
 
         _clipboardCapture.ClipCaptured += OnClipCaptured;
         _hotkeyService.HotkeyTriggered += OnHotkeyTriggered;
+        _clipboardCapture.StartListening();
 
         _ = LoadClipsAsync();
     }
@@ -386,6 +387,7 @@ public partial class MainWindow : Window
         _clipboardCapture.ClipCaptured -= OnClipCaptured;
         _hotkeyService.HotkeyTriggered -= OnHotkeyTriggered;
         _trayIcon.Dispose();
+        _clipboardCapture.StopListening();
         base.OnClosed(e);
     }
 }
