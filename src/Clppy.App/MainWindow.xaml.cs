@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +14,7 @@ using Clppy.Core.Models;
 using Clppy.Core.Paste;
 using Clppy.Core.Persistence;
 using Clppy.Core.Settings;
+using Clppy.App.Views;
 using Models = Clppy.Core.Models;
 
 namespace Clppy.App;
@@ -57,8 +59,9 @@ public partial class MainWindow : Window
     private async Task LoadClipsAsync()
     {
         Clips.Clear();
-        
-        var settings = await _settingsService.LoadAsync();
+
+        await _settingsService.LoadAsync();
+        var settings = _settingsService.Current;
         var historyRows = settings.HistoryRows;
         var historyCols = settings.HistoryCols;
         var totalRows = 30;

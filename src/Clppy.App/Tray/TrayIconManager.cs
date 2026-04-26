@@ -37,7 +37,7 @@ public class TrayIconManager : IDisposable
                 g.FillEllipse(brush, 4, 4, 24, 24);
             }
         }
-        return new System.Drawing.Icon(bitmap);
+        return System.Drawing.Icon.FromHandle(bitmap.GetHicon());
     }
 
     public void Initialize()
@@ -58,7 +58,7 @@ public class TrayIconManager : IDisposable
 
     public void ShowNotification(string message)
     {
-        _notifyIcon.ShowBalloonTip(1000, "Clppy", message, ToolTipInfo.Info);
+        _notifyIcon.ShowBalloonTip(1000, "Clppy", message, ToolTipIcon.Info);
     }
 
     private void NotifyIcon_MouseClick(object sender, MouseEventArgs e)
@@ -72,7 +72,7 @@ public class TrayIconManager : IDisposable
         }
         else if (e.Button == MouseButtons.Right)
         {
-            _notifyIcon.ContextMenuStrip.Show(_notifyIcon, e.Location);
+            _notifyIcon.ContextMenuStrip.Show(System.Windows.Forms.Cursor.Position);
         }
     }
 
@@ -101,7 +101,7 @@ public class TrayIconManager : IDisposable
         menu.Items.Add(new ToolStripSeparator());
 
         var quitItem = new ToolStripMenuItem("Quit");
-        quitItem.Click += (s, e) => Application.Shutdown();
+        quitItem.Click += (s, e) => Application.Current.Shutdown();
         menu.Items.Add(quitItem);
 
         return menu;
