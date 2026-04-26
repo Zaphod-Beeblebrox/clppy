@@ -11,4 +11,14 @@ public class ClppyDbContext : DbContext
 
     public DbSet<Clip> Clips { get; set; }
     public DbSet<Models.Settings> Settings { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Seed default settings
+        modelBuilder.Entity<Models.Settings>().HasData(
+            new Models.Settings { Id = 1 }
+        );
+    }
 }
