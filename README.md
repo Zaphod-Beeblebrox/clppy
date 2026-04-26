@@ -1,6 +1,6 @@
 # Clppy
 
-> *"It looks like you're trying to paste something. Would you like help with that?"*
+> "It looks like you're trying to paste something. Would you like help with that?"
 
 A Windows clipboard manager. MIT-licensed FOSS.
 
@@ -14,23 +14,86 @@ The full v0 specification is at [`SPEC.md`](SPEC.md).
 
 ## What it does (planned for v0)
 
-- Replaces the abandoned **Spartan Multi Clipboard** with a clean-room FOSS implementation
-- Single-sheet free-form 2D clip grid (you pick the cell)
-- Auto-rolling clipboard history zone
-- Multi-format clipboard preservation (text, RTF, HTML, image)
-- Two paste engines:
-  - **Direct** — standard clipboard paste with full format preservation
-  - **Inject** — synthesizes keystrokes via `SendInput` for apps that don't accept paste (e.g., legacy form fields with tab navigation)
-- Global hotkeys, per-clip color, soft delete, persistent storage
+- **Pristine-formatting paste** — Copy rich-text blocks and paste them without losing formatting
+- **Form-fill keyboard injection** — Store clips with tab characters and have Clppy type them into fields that don't accept paste
+- **History zone** — Automatic FIFO buffer for recent clipboard entries
+- **Pinned clips** — Drag clips out of history to pin them permanently
+- **Global hotkeys** — Assign hotkeys to clips for quick access
+- **Filter overlay** — Ctrl+F to search clips by label or content
 
-See [`SPEC.md`](SPEC.md) for the full scope.
+## Stack
 
-## Building
+- C# + WPF + .NET 8
+- SQLite + Entity Framework Core 8
+- Windows 10/11 only
 
-Build instructions will be added once the v0 scaffold lands.
+## Build
 
-Target stack: C# + WPF + .NET 8. Windows 10 / 11 (x64) only.
+### Prerequisites
+
+- .NET 8 SDK
+- Windows 10/11 (for building and running the WPF UI)
+
+### Commands
+
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build (Release mode)
+dotnet build -c Release
+
+# Run the application
+dotnet run --project src/Clppy.App
+
+# Run tests
+dotnet test
+```
+
+## Project Structure
+
+```
+clppy/
+├── src/
+│   ├── Clppy.Core/        # Non-UI logic (models, persistence, paste engines)
+│   └── Clppy.App/         # WPF UI application
+└── tests/
+    └── Clppy.Core.Tests/  # Unit tests for Core
+```
+
+## Contributing
+
+This project is built by autonomous agents. Human stakeholders review and merge PRs.
+
+### Development workflow
+
+1. Create a feature branch: `crew/<topic>`
+2. Make changes and write tests
+3. Ensure all tests pass: `dotnet test`
+4. Commit with clear messages
+5. Push to GitHub for review
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT License — see [`LICENSE`](LICENSE) for details.
+
+## Issues
+
+To file an issue:
+
+1. Go to the GitHub repository
+2. Click "Issues" → "New issue"
+3. Describe the problem or feature request
+4. Include steps to reproduce (for bugs)
+
+## Done Criteria (v0)
+
+See [`SPEC.md` §7](SPEC.md#7-done-criteria) for the complete list of v0 done criteria.
+
+Current status:
+- ✅ Core tests pass (21 tests)
+- ✅ Core builds cleanly on Linux
+- ✅ WPF UI structure implemented (requires Windows to build)
+- ⏳ Clipboard capture implemented (Win32)
+- ⏳ Paste engines implemented (Win32)
+- ⏳ UI requires final testing on Windows

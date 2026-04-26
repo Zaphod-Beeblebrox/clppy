@@ -2708,3 +2708,304 @@ wrote 9826 bytes to src/Clppy.Core/Clipboard/ClipboardCaptureService.cs
 ```
 
 </details>
+
+# Tick 22 — 2026-04-25 20:30:57 — wall_time (12 actions)
+
+## action 1 — run_command
+
+**thought:** Fixed the ClipboardCaptureService with proper WndProc delegate. Let me verify the build passes and tests run successfully.
+
+**args:** `{"command": "dotnet test tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj --verbosity normal 2>&1 | tail -25"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+       Skipping target "GenerateTargetFrameworkMonikerAttribute" because all output files are up-to-date with respect to the input files.
+       CoreGenerateAssemblyInfo:
+       Skipping target "CoreGenerateAssemblyInfo" because all output files are up-to-date with respect to the input files.
+       _GenerateSourceLinkFile:
+         Source Link file 'obj/Debug/net8.0/Clppy.Core.sourcelink.json' is up-to-date.
+       CoreCompile:
+         /usr/lib/dotnet/dotnet exec "/usr/li
+... [truncated for log; full 26364 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 2 — run_command
+
+**thought:** The output was truncated but shows compilation is happening. Let me run a simpler command to see the actual test results.
+
+**args:** `{"command": "dotnet test tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj --no-build 2>&1 | grep -E \"(Passed|Failed|Total tests)\""}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 889 ms - Clppy.Core.Tests.dll (net8.0)
+
+
+```
+
+</details>
+
+## action 3 — run_command
+
+**thought:** All 21 tests pass. Now let me verify the Core builds cleanly in Release mode, then commit this work.
+
+**args:** `{"command": "dotnet build -c Release src/Clppy.Core/Clppy.Core.csproj 2>&1 | tail -10"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+  All projects are up-to-date for restore.
+/home/mwilson/code/clppy/src/Clppy.Core/Clipboard/ClipboardCaptureService.cs(243,38): error CS0102: The type 'ClipboardCaptureService' already contains a definition for 'WndProcDelegateInstance' [/home/mwilson/code/clppy/src/Clppy.Core/Clppy.Core.csproj]
+
+Build FAILED.
+
+/home/mwilson/code/clppy/src/Clppy.Core/Clipboard/ClipboardCaptureService.cs(243,38): error CS0102: The type 'ClipboardCaptureService' already contains a definition
+... [truncated for log; full 650 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 4 — read_file
+
+**thought:** There's a duplicate definition for WndProcDelegateInstance. I need to read the file and remove the duplicate - I likely have both a field declaration and a method with the same name.
+
+**args:** `{"path": "src/Clppy.Core/Clipboard/ClipboardCaptureService.cs"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using Clppy.Core.Models;
+using Clppy.Core.Persistence;
+
+namespace Clppy.Core.Clipboard;
+
+public class ClipboardCaptureService : IClipboardCapture, IDisposable
+{
+    private readonly IClipRepository _clipRepository;
+    private readonly HistoryBuffer _historyBuffer;
+    private IntPtr _hwndListener;
+    private bool _isListening;
+    private bool _disposed;
+    private DateTime _lastCaptureTime;
+    private const int CAPTURE_C
+... [truncated for log; full 9826 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 5 — write_file
+
+**thought:** I see the duplicate - there's a method `WndProcDelegateInstance` on line 75 and a field with the same name on line 243. I need to remove the method and keep only the field that references the static WndProc method.
+
+**args:** `{"path": "src/Clppy.Core/Clipboard/ClipboardCaptureService.cs", "content": "using System;\nusing System.Runtime.InteropServices;\nusing System.Text;\nusing Clppy.Core.Models;\nusing Clppy.Core.Persistence;\n\nnamespace Clppy.Core.Clipboard;\n\npublic class ClipboardCaptureService : IClipboardCapture, IDisposable\n{\n    private readonly IClipRepository _clipRepository;\n    private readonly HistoryBuffer _historyBuffer;\n    private IntPtr _hwndListener;\n    private bool _isListening;\n    private bool _disposed;\n    private DateTime _lastCaptureTime;\n    private const int CAPTURE_COOLDOWN_MS = 500;\n    private static ClipboardCaptureService? _currentInstance;\n\n    public event Action<Clip>? ClipCaptured;\n\n    public ClipboardCaptureService(IClipRepository clipRepository)\n    {\n        _clipRepository = clipRepository;\n        _historyBuffer = new HistoryBuffer(20);\n        _currentInstance = this;\n    }\n\n    public void StartListening()\n    {\n        if (_isListening) return;\n\n        _hwndListener = CreateHiddenWindow();\n        if (_hwndListener != IntPtr.Zero)\n        {\n            AddClipboardFormatListener(_hwndListener);\n            _isListening = true;\n        }\n    }\n\n    public void StopListening()\n    {\n        if (!_isListening) return;\n\n        if (_hwndListener != IntPtr.Zero)\n        {\n            RemoveClipboardFormatListener(_hwndListener);\n            DestroyWindow(_hwndListener);\n            _hwndListener = IntPtr.Zero;\n        }\n        _isListening = false;\n    }\n\n    private IntPtr CreateHiddenWindow()\n    {\n        var wc = new WNDCLASSEX\n        {\n            cbSize = Marshal.SizeOf<WNDCLASSEX>(),\n            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),\n            hInstance = IntPtr.Zero,\n            lpszClassName = \"ClppyClipboardListener\",\n            hCursor = IntPtr.Zero,\n            hIcon = IntPtr.Zero,\n            hIconSm = IntPtr.Zero,\n            hbrBackground = IntPtr.Zero,\n            cbClsExtra = 0,\n            cbWndExtra = 0\n        };\n\n        var atom = RegisterClassEx(ref wc);\n        if (atom == 0) return IntPtr.Zero;\n\n        var hwnd = CreateWindowEx(0, \"ClppyClipboardListener\", \"\", 0,\n            0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);\n        return hwnd;\n    }\n\n    private void CaptureClipboardContent()\n    {\n        try\n        {\n            if (!OpenClipboard(IntPtr.Zero))\n                return;\n\n            var clip = new Clip\n            {\n                Id = Guid.NewGuid(),\n                CreatedAt = DateTime.UtcNow,\n                UpdatedAt = DateTime.UtcNow,\n                Pinned = false,\n                Method = PasteMethod.Direct\n            };\n\n            uint format = 0;\n            while ((format = EnumClipboardFormats(format)) != 0)\n            {\n                if (format == CF_UNICODETEXT)\n                {\n                    var text = GetClipboardText();\n                    if (!string.IsNullOrEmpty(text))\n                    {\n                        clip.PlainText = text;\n                        clip.Label = GetLabelFromText(text);\n                    }\n                }\n                else if (format == CF_OEMTEXT)\n                {\n                    if (clip.PlainText == null)\n                    {\n                        var oemText = GetClipboardOemText();\n                        if (!string.IsNullOrEmpty(oemText))\n                        {\n                            clip.PlainText = oemText;\n                            clip.Label = GetLabelFromText(oemText);\n                        }\n                    }\n                }\n                else if (format == CF_RTF)\n                {\n                    var rtf = GetClipboardRtf();\n                    if (rtf != null && rtf.Length > 0)\n                        clip.Rtf = rtf;\n                }\n            }\n\n            CloseClipboard();\n\n            if (!string.IsNullOrEmpty(clip.PlainText) || clip.Rtf != null || clip.Html != null)\n            {\n                _ = _clipRepository.AddAsync(clip);\n                _historyBuffer.Add(clip);\n                ClipCaptured?.Invoke(clip);\n            }\n        }\n        catch\n        {\n            try { CloseClipboard(); } catch { }\n        }\n    }\n\n    private string? GetClipboardText()\n    {\n        var handle = GetClipboardData(CF_UNICODETEXT);\n        if (handle == IntPtr.Zero) return null;\n\n        var ptr = GlobalLock(handle);\n        if (ptr == IntPtr.Zero) return null;\n\n        try\n        {\n            return Marshal.PtrToStringUni(ptr);\n        }\n        finally\n        {\n            GlobalUnlock(handle);\n        }\n    }\n\n    private string? GetClipboardOemText()\n    {\n        var handle = GetClipboardData(CF_OEMTEXT);\n        if (handle == IntPtr.Zero) return null;\n\n        var ptr = GlobalLock(handle);\n        if (ptr == IntPtr.Zero) return null;\n\n        try\n        {\n            return Marshal.PtrToStringAnsi(ptr);\n        }\n        finally\n        {\n            GlobalUnlock(handle);\n        }\n    }\n\n    private byte[]? GetClipboardRtf()\n    {\n        var rtfFormat = RegisterClipboardFormat(\"Rich Text Format\");\n        if (rtfFormat == 0) return null;\n\n        var handle = GetClipboardData(rtfFormat);\n        if (handle == IntPtr.Zero) return null;\n\n        var ptr = GlobalLock(handle);\n        if (ptr == IntPtr.Zero) return null;\n\n        try\n        {\n            var size = GlobalSize(handle);\n            var buffer = new byte[size];\n            Marshal.Copy(ptr, buffer, 0, (int)size);\n            return buffer;\n        }\n        finally\n        {\n            GlobalUnlock(handle);\n        }\n    }\n\n    private string GetLabelFromText(string text)\n    {\n        var firstLine = text.Split('\\n')[0].Replace(\"\\r\", \"\");\n        return firstLine.Length > 30 ? firstLine[..30] + \"...\" : firstLine;\n    }\n\n    public void Dispose()\n    {\n        if (!_disposed)\n        {\n            StopListening();\n            _currentInstance = null;\n            _disposed = true;\n        }\n    }\n\n    private const int CF_UNICODETEXT = 13;\n    private const int CF_OEMTEXT = 7;\n    private const int CF_RTF = 0x00CF;\n\n    [UnmanagedFunctionPointer(CallingConvention.StdCall)]\n    private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);\n\n    private readonly WndProcDelegate _wndProcDelegate = WndProc;\n\n    private static IntPtr WndProc(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam)\n    {\n        const uint WM_CLIPBOARDUPDATE = 0x031D;\n        \n        if (Msg == WM_CLIPBOARDUPDATE && _currentInstance != null)\n        {\n            var now = DateTime.UtcNow;\n            var elapsed = (now - _currentInstance._lastCaptureTime).TotalMilliseconds;\n            \n            if (elapsed > CAPTURE_COOLDOWN_MS)\n            {\n                _currentInstance._lastCaptureTime = now;\n                _currentInstance.CaptureClipboardContent();\n            }\n        }\n        \n        return DefWindowProc(hWnd, Msg, wParam, lParam);\n    }\n\n    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]\n    private struct WNDCLASSEX\n    {\n        public int cbSize;\n        public uint style;\n        public IntPtr lpfnWndProc;\n        public int cbClsExtra;\n        public int cbWndExtra;\n        public IntPtr hInstance;\n        public IntPtr hIcon;\n        public IntPtr hCursor;\n        public IntPtr hbrBackground;\n        [MarshalAs(UnmanagedType.LPTStr)]\n        public string? lpszMenuName;\n        [MarshalAs(UnmanagedType.LPTStr)]\n        public string lpszClassName;\n        public IntPtr hIconSm;\n    }\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern ushort RegisterClassEx(ref WNDCLASSEX lpwcx);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern IntPtr CreateWindowEx(uint dwExStyle, string lpClassName, string lpWindowName, uint dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);\n\n    [DllImport(\"user32.dll\")]\n    private static extern IntPtr DefWindowProc(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);\n\n    [DllImport(\"user32.dll\")]\n    private static extern bool DestroyWindow(IntPtr hWnd);\n\n    [DllImport(\"user32.dll\")]\n    private static extern bool AddClipboardFormatListener(IntPtr hwnd);\n\n    [DllImport(\"user32.dll\")]\n    private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern bool OpenClipboard(IntPtr hWndNewOwner);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern bool CloseClipboard();\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern uint EnumClipboardFormats(uint format);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern IntPtr GetClipboardData(uint uFormat);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern IntPtr GlobalLock(IntPtr hMem);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern bool GlobalUnlock(IntPtr hMem);\n\n    [DllImport(\"kernel32.dll\", SetLastError = true)]\n    private static extern uint GlobalSize(IntPtr hMem);\n\n    [DllImport(\"user32.dll\", SetLastError = true)]\n    private static extern uint RegisterClipboardFormat(string lpszFormat);\n}\n"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+wrote 9241 bytes to src/Clppy.Core/Clipboard/ClipboardCaptureService.cs
+```
+
+</details>
+
+## action 6 — run_command
+
+**thought:** Fixed the duplicate WndProcDelegateInstance definition. Now let me verify the build passes and tests still work.
+
+**args:** `{"command": "dotnet build -c Release src/Clppy.Core/Clppy.Core.csproj 2>&1 | tail -10"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+  Clppy.Core -> /home/mwilson/code/clppy/src/Clppy.Core/bin/Release/net8.0/Clppy.Core.dll
+
+Build succeeded.
+
+/home/mwilson/code/clppy/src/Clppy.Core/Hotkeys/HotkeyService.cs(13,20): warning CS0169: The field 'HotkeyService._windowHandle' is never used [/home/mwilson/code/clppy/src/Clppy.Core/Clppy.Core.csproj]
+/home/mwilson/code/clppy/src/Clppy.Core/Hotkeys/HotkeyService.cs(16,32): warning CS0067: The event 'HotkeyService.HotkeyTriggered' is never used [/home/mwilson/code/c
+... [truncated for log; full 598 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 7 — run_command
+
+**thought:** Build succeeds with only 2 warnings (unused HotkeyService fields - expected for partial Win32 integration). Let me verify tests pass, then commit this work.
+
+**args:** `{"command": "dotnet test tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj --verbosity normal 2>&1 | tail -10"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+
+
+       "/home/mwilson/code/clppy/tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj" (VSTest target) (1:7) ->
+       "/home/mwilson/code/clppy/tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj" (default target) (1:8) ->
+         /home/mwilson/code/clppy/tests/Clppy.Core.Tests/PersistenceTests.cs(72,39): warning CS8602: Dereference of a possibly null reference. [/home/mwilson/code/clppy/tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj]
+
+    3 Warning(s)
+    0 Error(s)
+
+Time Elapsed
+... [truncated for log; full 514 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 8 — run_command
+
+**thought:** Build succeeded. Let me verify tests actually passed by checking the test results specifically.
+
+**args:** `{"command": "dotnet test tests/Clppy.Core.Tests/Clppy.Core.Tests.csproj --no-build 2>&1 | grep -E \"(Passed|Failed|Total)\""}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+Passed!  - Failed:     0, Passed:    21, Skipped:     0, Total:    21, Duration: 902 ms - Clppy.Core.Tests.dll (net8.0)
+
+
+```
+
+</details>
+
+## action 9 — git_status
+
+**thought:** All 21 tests pass. Core builds cleanly with only minor warnings. Let me check git status and commit this work.
+
+**args:** `{}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+exit=0
+--- stdout ---
+ M PROGRESS.md
+ M src/Clppy.Core/Clipboard/ClipboardCaptureService.cs
+
+
+```
+
+</details>
+
+## action 10 — git_commit
+
+**thought:** ClipboardCaptureService is now properly implemented with Win32 clipboard capture using AddClipboardFormatListener. Let me commit this work.
+
+**args:** `{"message": "Implement clipboard capture with Win32 AddClipboardFormatListener\n\n- Capture clipboard changes via hidden window message loop\n- Enumerate formats: UnicodeText, OEMText, RTF\n- Extract text content and use first line as label\n- 500ms cooldown to prevent capture loops\n- HistoryBuffer integration for FIFO rolloff\n- All 21 Core tests pass"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+[agent-loop/clppy-v0 816f4d8] Implement clipboard capture with Win32 AddClipboardFormatListener
+ 2 files changed, 970 insertions(+), 71 deletions(-)
+```
+
+</details>
+
+## action 11 — read_file
+
+**thought:** Clipboard capture is committed. Now I need to verify the remaining done criteria. Let me check the README.md to ensure it documents the project properly (done criteria #15), and verify the LICENSE is MIT (done criteria #16).
+
+**args:** `{"path": "README.md"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+# Clppy
+
+> *"It looks like you're trying to paste something. Would you like help with that?"*
+
+A Windows clipboard manager. MIT-licensed FOSS.
+
+## Status
+
+**Pre-alpha — under construction.**
+
+This project is being built primarily by a crew of autonomous AI agents running on local hardware, as an exercise in autonomous local-AI software development. Code is reviewed and merged by a human stakeholder.
+
+The full v0 specification is at [`SPEC.md`](SPEC.md).
+
+## What it does (planned for v0)
+
+- Repla
+... [truncated for log; full 1265 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+## action 12 — read_file
+
+**thought:** README exists but needs updated build instructions. Let me check the LICENSE file first, then update the README with proper build/run instructions.
+
+**args:** `{"path": "LICENSE"}`
+
+**result:** OK
+
+<details><summary>output</summary>
+
+```
+MIT License
+
+Copyright (c) 2026 Mike Wilson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright n
+... [truncated for log; full 1068 chars — re-run action or re-read file if needed]
+```
+
+</details>
+
+# Tick 23 — 2026-04-25 20:41:57 — llm_error (1 action)
+
+## action 1 — llm_error
+
+**result:** FAIL
+
+```
+JSONDecodeError("Expecting ',' delimiter: line 4 column 3122 (char 3364)")
+```
