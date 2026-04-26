@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
@@ -204,6 +205,7 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
 
+        // Paste
         var pasteItem = new MenuItem { Header = "Paste" };
         pasteItem.Click += async (s, e) =>
         {
@@ -212,16 +214,17 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(pasteItem);
 
+        // Paste as text
         var pasteAsTextItem = new MenuItem { Header = "Paste as text" };
         pasteAsTextItem.Click += async (s, e) =>
         {
-            // Force Direct with plain text only
             var tempClip = new Clip { PlainText = clip.PlainText, Method = PasteMethod.Direct };
             var engine = _pasteRouter.GetEngine(tempClip, false);
             await engine.PasteAsync(tempClip, IntPtr.Zero);
         };
         menu.Items.Add(pasteAsTextItem);
 
+        // Paste as keystrokes
         var pasteAsKeystrokesItem = new MenuItem { Header = "Paste as keystrokes" };
         pasteAsKeystrokesItem.Click += async (s, e) =>
         {
@@ -232,6 +235,7 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
+        // Edit
         var editItem = new MenuItem { Header = "Edit..." };
         editItem.Click += (s, e) =>
         {
@@ -244,6 +248,91 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(editItem);
 
+        // Rename
+        var renameItem = new MenuItem { Header = "Rename..." };
+        renameItem.Click += (s, e) =>
+        {
+            var dialog = new Window
+            {
+                Title = "Rename Clip",
+                Width = 300,
+                Height = 150,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new StackPanel { Margin = 10, Children = {
+                    new TextBox { Name = "RenameTextBox", Margin = new Thickness(0,0,0,10), Text = clip.Label ?? "" },
+                    new Button { Content = "OK", Width = 70, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,10,0,0) }
+                }};
+            };
+            dialog.Loaded += (s2, e2) => ((TextBox)dialog.FindName("RenameTextBox")).Focus();
+            if (dialog.ShowDialog() == true)
+            {
+                var textBox = (TextBox)dialog.FindName("RenameTextBox");
+                clip.Label = textBox.Text;
+                _ = _clipRepository.UpdateAsync(clip);
+                _ = LoadClipsAsync();
+            }
+        };
+        menu.Items.Add(renameItem);
+
+        // Set color
+        var setColorItem = new MenuItem { Header = "Set color..." };
+        setColorItem.Click += (s, e) =>
+        {
+            var dialog = new ColorPickerDialog();
+            if (dialog.ShowDialog() == true && dialog.SelectedColor.HasValue)
+            {
+                clip.ColorHex = dialog.SelectedColor.Value.ToString();
+                _ = _clipRepository.UpdateAsync(clip);
+                _ = LoadClipsAsync();
+            }
+        };
+        menu.Items.Add(setColorItem);
+
+        // Set hotkey
+        var setHotkeyItem = new MenuItem { Header = "Set hotkey..." };
+        setHotkeyItem.Click += (s, e) =>
+        {
+            var editor = new ClipEditorWindow(clip, _clipRepository, _hotkeyService);
+            if (editor.ShowDialog() == true && editor.ResultClip != null)
+            {
+                _ = _clipRepository.UpdateAsync(editor.ResultClip);
+                _ = LoadClipsAsync();
+            }
+        };
+        menu.Items.Add(setHotkeyItem);
+
+        // Set default paste method
+        var setMethodItem = new MenuItem { Header = "Set default paste method" };
+        var directMethodItem = new MenuItem { Header = "Direct (▶)", IsCheckable = true, IsChecked = clip.Method == PasteMethod.Direct };
+        var injectMethodItem = new MenuItem { Header = "Inject (⌨)", IsCheckable = true, IsChecked = clip.Method == PasteMethod.Inject };
+        directMethodItem.Click += async (s, e) =>
+        {
+            clip.Method = PasteMethod.Direct;
+            await _clipRepository.UpdateAsync(clip);
+            _ = LoadClipsAsync();
+        };
+        injectMethodItem.Click += async (s, e) =>
+        {
+            clip.Method = PasteMethod.Inject;
+            await _clipRepository.UpdateAsync(clip);
+            _ = LoadClipsAsync();
+        };
+        setMethodItem.Items.Add(directMethodItem);
+        setMethodItem.Items.Add(injectMethodItem);
+        menu.Items.Add(setMethodItem);
+
+        menu.Items.Add(new Separator());
+
+        // Move to history zone
+        var moveToHistoryItem = new MenuItem { Header = "Move to history zone" };
+        moveToHistoryItem.Click += async (s, e) =>
+        {
+            await _clipRepository.UpdateClipPositionAsync(clip.Id, 0, 0);
+            _ = LoadClipsAsync();
+        };
+        menu.Items.Add(moveToHistoryItem);
+
+        // Delete
         var deleteItem = new MenuItem { Header = "Delete" };
         deleteItem.Click += async (s, e) =>
         {
@@ -352,7 +441,7 @@ public class ClipCellViewModel : INotifyPropertyChanged
         set { _opacity = value; OnPropertyChanged(); }
     }
 
-    public ClipCellViewModel(Clip? clip, bool isInHistoryZone, Settings settings)
+    public ClipCellViewModel(Clip? clip, bool isInHistoryZone, Models.Settings settings)
     {
         Clip = clip;
         IsInHistoryZone = isInHistoryZone;

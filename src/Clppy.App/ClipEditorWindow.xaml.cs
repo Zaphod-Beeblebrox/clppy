@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Clppy.Core.Models;
 using Clppy.Core.Persistence;
 using Clppy.Core.Hotkeys;
+using Clppy.App.Views;
 
 namespace Clppy.App;
 
@@ -150,67 +151,5 @@ public partial class ClipEditorWindow : Window
     {
         DialogResult = false;
         Close();
-    }
-}
-
-// Simple color picker dialog
-class ColorPickerDialog : Window
-{
-    public Color? SelectedColor { get; private set; }
-
-    public ColorPickerDialog()
-    {
-        Title = "Pick Color";
-        Width = 250;
-        Height = 300;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
-
-        var grid = new Grid { Margin = 10 };
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var label = new TextBlock { Text = "Select a color:", Margin = new Thickness(0, 0, 0, 10) };
-        grid.Children.Add(label);
-        Grid.SetRow(label, 0);
-
-        var colorPicker = new System.Windows.Controls.ColorPicker();
-        colorPicker.SelectedColor = Colors.White;
-        colorPicker.Margin = new Thickness(0, 0, 0, 10);
-        grid.Children.Add(colorPicker);
-        Grid.SetRow(colorPicker, 1);
-
-        var preview = new Border { Height = 50, Background = Brushes.White, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 10) };
-        colorPicker.SelectedColorChanged += (s, e) => preview.Background = new SolidColorBrush(colorPicker.SelectedColor ?? Colors.White);
-        grid.Children.Add(preview);
-        Grid.SetRow(preview, 2);
-
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        
-        var okButton = new Button { Content = "OK", Width = 70, Margin = new Thickness(0, 0, 10, 0) };
-        okButton.Click += (s, e) =>
-        {
-            SelectedColor = colorPicker.SelectedColor;
-            DialogResult = true;
-            Close();
-        };
-        buttons.Children.Add(okButton);
-
-        var cancelButton = new Button { Content = "Cancel", Width = 70 };
-        cancelButton.Click += (s, e) =>
-        {
-            DialogResult = false;
-            Close();
-        };
-        buttons.Children.Add(cancelButton);
-
-        grid.Children.Add(buttons);
-        Grid.SetRow(buttons, 3);
-
-        Content = grid;
     }
 }
