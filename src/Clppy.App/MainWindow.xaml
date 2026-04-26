@@ -54,7 +54,6 @@
                                 Background="{Binding BackgroundBrush}"
                                 MouseLeftButtonUp="ClipCell_MouseLeftButtonUp"
                                 MouseLeftButtonDown="ClipCell_MouseLeftButtonDown"
-                                MouseDoubleClick="ClipCell_MouseDoubleClick"
                                 MouseRightButtonUp="ClipCell_MouseRightButtonUp"
                                 MouseMove="ClipCell_MouseMove"
                                 AllowDrop="True"

@@ -113,24 +113,23 @@ public partial class MainWindow : Window
 
     private void ClipCell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        var vm = (ClipCellViewModel)((Border)sender).DataContext;
+        if (vm.Clip == null) return;
+
+        if (e.ClickCount == 2)
         {
-            var vm = (ClipCellViewModel)((Border)sender).DataContext;
-            if (vm.Clip != null)
+            var editor = new ClipEditorWindow(vm.Clip, _clipRepository, _hotkeyService);
+            if (editor.ShowDialog() == true && editor.ResultClip != null)
             {
-                var engine = _pasteRouter.GetEngine(vm.Clip, true);
-                _ = engine.PasteAsync(vm.Clip, IntPtr.Zero);
+                _ = _clipRepository.UpdateAsync(editor.ResultClip);
+                _ = LoadClipsAsync();
             }
+            return;
         }
-        else
-        {
-            var vm = (ClipCellViewModel)((Border)sender).DataContext;
-            if (vm.Clip != null)
-            {
-                var engine = _pasteRouter.GetEngine(vm.Clip, false);
-                _ = engine.PasteAsync(vm.Clip, IntPtr.Zero);
-            }
-        }
+
+        var useOverride = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var engine = _pasteRouter.GetEngine(vm.Clip, useOverride);
+        _ = engine.PasteAsync(vm.Clip, IntPtr.Zero);
     }
 
     private void ClipCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -140,20 +139,6 @@ public partial class MainWindow : Window
         {
             _draggedClip = vm.Clip;
             _dragStartPoint = e.GetPosition(this);
-        }
-    }
-
-    private void ClipCell_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        var vm = (ClipCellViewModel)((Border)sender).DataContext;
-        if (vm.Clip != null)
-        {
-            var editor = new ClipEditorWindow(vm.Clip, _clipRepository, _hotkeyService);
-            if (editor.ShowDialog() == true && editor.ResultClip != null)
-            {
-                _ = _clipRepository.UpdateAsync(editor.ResultClip);
-                _ = LoadClipsAsync();
-            }
         }
     }
 
