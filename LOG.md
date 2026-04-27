@@ -83,3 +83,79 @@ The worker did not actually run `dotnet test` as a per-task gate (or did and ign
 - The CrewAI 1.12 `max_iter` fallback uses assistant-message prefill, which conflicts with Qwen3.5 thinking mode. Resolve before Phase 3 — either patch `llama_compat.py` to strip prefill, or run the architect with thinking-off for review tasks.
 
 **Phase 2 completion timestamp:** 2026-04-25 ~12:00 UTC (worker runs done ~11:40; manual fixes + verification through ~12:00)
+
+---
+
+## Phase 3: UI implementation — pivot to heartbeat harness
+
+**Run start timestamp:** 2026-04-25 ~16:00 UTC
+**Driver:** new heartbeat-driven ReAct harness (`~/code/agent-loop/`) — NOT CrewAI
+**Supervisor:** Qwen3.5-122B-A10B-Q4 @ Strix supervisor (192.168.21.4:8080), thinking ON
+**Worker:** none (single-LLM v0; supervisor handles plan + execute)
+**Working dir:** `~/code/clppy/` on Optiplex (sacrificial agent host)
+**Cadence:** systemd-user timer firing every ~10 minutes; 15-action budget per tick
+
+### Why the pivot away from CrewAI
+
+CrewAI's `force_final_answer` recovery prompt overrode task instructions, leading to passing-but-broken outputs in Phase 2 (the five bugs documented above). The architect-review crash on assistant-message prefill (Qwen3.5 thinking-mode incompatibility) was the proximate trigger; the deeper reason is the framework took control away from the goal text. Replaced with a thin heartbeat harness that just wakes the model up, executes one action, logs the result, and yields back to the model — no opinionated recovery, no prompt overrides.
+
+### What the loop built
+
+Over an overnight run (27 ticks), the agent shipped 5 substantive commits implementing Phase 3 from PLAN.md: WPF MainWindow with grid, ClipEditor dialog, drag-to-pin, Tray icon (NotifyIcon), filter overlay, hotkey wiring, App.xaml DI bootstrap. Agent called `done` and the loop wrote `PHASE_DONE`.
+
+### Bugs surfaced during Windows verification (human-corrected)
+
+The agent host is Linux; WPF cannot build there. The agent had no compile feedback on UI code — it shipped what looked right but couldn't be verified. Eight rounds of fix-build-fail-fix on a Windows laptop:
+
+1. csproj path bug: `..\src\Clppy.Core\` from `src/Clppy.App` resolved to `src/src/...`. Fixed to `..\Clppy.Core\`.
+2. `MC3072`: `MouseDoubleClick` event on a `Border` (Border inherits Decorator, not Control). Folded into `MouseLeftButtonUp` with `e.ClickCount == 2`.
+3. `Margin = 10` on a WPF dialog (needs `Thickness`). Fixed.
+4. Stray `;` in collection initializer (`}};` → `}}`). Fixed.
+5. `UseWindowsForms` missing in csproj — needed for `NotifyIcon`. Added.
+6. `Icon.FromHandle(bitmap.GetHicon())` instead of `new Icon(bitmap)`. `ToolTipIcon.Info` not `ToolTipInfo.Info`. `ContextMenuStrip.Show(Cursor.Position)` not `Show(notifyIcon, e.Location)`. `Application.Current.Shutdown()` not static `Application.Shutdown()`.
+7. App.xaml `StartupUri="MainWindow.xaml"` conflicted with DI lifetime management. Removed; DI manages MainWindow.
+8. Runtime crash: SQLite schema not bootstrapped on first launch. Added `EnsureCreatedAsync()` in OnStartup; wrapped in try/catch with MessageBox to surface async-void exceptions.
+
+Lesson encoded for future loops (harness-level): **agent host must have build-verification parity with the project target**. If you can't compile, you can't validate, and the agent ships latent bugs that only surface on the target platform. Saved as a feedback memory in the operator's notes.
+
+### CI + release wiring (human, not agent)
+
+- `.github/workflows/build.yml`: restore + build (Release) + test on `windows-latest`, triggers on push/PR to main.
+- `.github/workflows/release.yml`: on `v*` tag push, `dotnet publish` produces single-file self-contained `Clppy.App.exe`; `gh release create` attaches it as a Pre-release.
+
+### v0.0.1 published
+
+**2026-04-26** — `Clppy v0.0.1` Pre-release on GitHub. All §7 done criteria verified on a Windows laptop. End-to-end: clipboard capture, history rolloff, Direct + Inject paste, drag-to-pin, tray, filter, hotkey registration. Downloadable `.exe` is the working artifact.
+
+### Phase 3 completion timestamp
+
+**2026-04-26 ~13:00 UTC** (build verification + CI/release wiring + v0.0.1 published)
+
+---
+
+## Maintenance handoff
+
+**2026-04-26 mid-day** — Project handed to the heartbeat loop in *perpetual issue-driven maintenance* mode:
+
+- `agent-loop/projects/clppy/config.toml` rewritten: each tick reads open GH issues, picks one (priority/high → oldest), comments pickup, fixes, commits to main, ends naturally. Next tick checks CI on prior commits, comments closure or failure.
+- `auto_commit_branch = "main"` (was `agent-loop/clppy-v0`); main-branch commit guard removed from harness `tools.py`. Safety boundary moved to GH branch protection + the sacrificial Optiplex (owner can pull power / delete repo).
+- Auto-tag flow added: on issue closure with green CI, agent reads latest tag, bumps patch (`v0.0.1 → v0.0.2`), tags HEAD, pushes the tag (firing the release workflow), comments the release URL on the issue, closes. Minor/major bumps remain a human decision.
+
+### v0.0.2
+
+**2026-04-26 evening** — First true autonomous cycle: Bob filed Issue #3 ("Runs, but doesn't show clips"). Agent picked it up, diagnosed missing `_clipboardCapture.StartListening()` call in MainWindow, committed the fix, CI green, tagged `v0.0.2`, posted the release URL, closed the issue. Round-trip "filed → fix on main": ~12 min. Filed → downloadable: ~25 min including release workflow.
+
+---
+
+## Harness defects observed and fixed
+
+- **PROGRESS.md collision**: agent overwrote harness's tick journal via `write_file`. Fixed: `write_file` refuses harness-owned files; system prompt declares ownership contract.
+- **Missing git push**: `tools.git_commit` only ran `git commit`, not `git push`. Agent thought it shipped fixes that were sitting local-only. Fixed: `git_commit` now pushes.
+- **PROGRESS.md context bloat**: file grew to 467KB / ~117k tokens over 118 maintenance ticks; loaded into prompt every tick; eventually exceeded Strix's `n_ctx`, killing the loop with HTTP 400. Fixed (2026-04-27): bifurcated the journal — `AUDIT.md` (full forensic, never prompt-loaded) + `PROGRESS.md` (last 5 ticks, regenerated each tick). Added `idle` action so perpetual loops can end ticks early without burning the action budget.
+- **SPEC/LOG/PLAN drift**: docs froze at the v0 build moment and continued to be auto-loaded into every prompt. Fixed (2026-04-27): SPEC.md governance bits updated to current reality, this LOG.md completed and closed, PLAN.md deleted (build-time artifact), `read_files` trimmed to PROGRESS.md only.
+
+---
+
+## Log closed
+
+This journal is **closed**. Subsequent activity lives in `git log`, GitHub Issues / PRs / Releases, and the harness `AUDIT.md` (local-only on the agent host).

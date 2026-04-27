@@ -2,7 +2,9 @@
 
 > "It looks like you're trying to paste something. Would you like help with that?"
 
-This document is the contract between the human stakeholder and the autonomous agent crew building Clppy v0. The crew should treat this document as authoritative for scope. Anything not in this document is **out of scope for v0** unless explicitly added during the run by the stakeholder.
+This document was the original contract for the v0 build (shipped as `v0.0.1` on 2026-04-26). It remains authoritative for **product behavior** — sections 2–6, 10, and 11 define what Clppy is and what's in/out of scope. Section 7's done criteria define acceptance for any v0 regression.
+
+The **process/governance** sections (§1 repo posture, §8 LOG.md, §9 conventions, §12 sign-off) have been updated to reflect the current autonomous-maintenance posture, not the original CrewAI-build posture they were written for.
 
 ---
 
@@ -13,7 +15,7 @@ Clppy is a Windows-only clipboard manager. MIT-licensed FOSS. It is a clean-room
 - **Stack:** C# + WPF + .NET 8
 - **License:** MIT
 - **Platform:** Windows 10 / Windows 11 (64-bit)
-- **Repo posture:** Public GitHub. Agents push to feature branches; the human stakeholder merges to `main`.
+- **Repo posture:** Public GitHub. v0 is shipped. The project runs as an autonomous maintenance loop: a heartbeat-driven local-LLM agent reads open issues, commits fixes directly to `main`, and tags patch releases on issue closure. CI on `windows-latest` verifies the build; the release workflow produces a single-file self-contained `Clppy.App.exe` on `v*` tag push.
 
 ### 1.1 Target user
 
@@ -309,9 +311,9 @@ All tests in `Clppy.Core.Tests` must pass. Tests should be deterministic, in-mem
 
 ---
 
-## 7. "Done" criteria
+## 7. "Done" criteria (v0 — shipped)
 
-The crew is done with v0 when ALL of the following are true:
+All criteria below were satisfied as of `v0.0.1` (2026-04-26). Retained as the acceptance contract for any v0 regression filed against the maintenance loop:
 
 1. `dotnet build -c Release` succeeds with zero errors and zero warnings related to Clppy code.
 2. `dotnet test` passes all tests.
@@ -336,41 +338,24 @@ The crew is done with v0 when ALL of the following are true:
 
 ---
 
-## 8. LOG.md — Agent run journal
+## 8. LOG.md — Agent run journal (closed)
 
-The agent crew must maintain a `LOG.md` at the repository root throughout the run. This file is not for users; it is a record of how the autonomous build went, for the human stakeholder's review. It is the **second deliverable** of this exercise (the clipboard manager being the first).
+`LOG.md` is the historical narrative of the v0 build: scaffolding, Core implementation, the pivot from CrewAI to the heartbeat harness, the WPF debug pass on Windows, and the v0.0.1 ship. It was the build's "second deliverable" alongside the clipboard manager itself.
 
-Required entries, in order:
-- **Run start timestamp**
-- **Crew configuration** — supervisor model, worker model, endpoints, frameworks
-- **Per-major-phase entries** with timestamps:
-  - "Scaffold solution and projects"
-  - "Implement Core data model and persistence"
-  - "Implement clipboard capture"
-  - "Implement Direct paste engine"
-  - "Implement Inject paste engine"
-  - "Implement WPF UI shell"
-  - "Implement clip cell rendering and grid"
-  - "Implement context menus and clip editor"
-  - "Implement drag-to-pin"
-  - "Implement global hotkeys"
-  - "Implement filter overlay"
-  - "Tests pass"
-  - "Done criteria validated"
-- **Notable failures or stalls**, including: model that produced bad output, what was tried, what unstuck it
-- **Run end timestamp** with total wall-clock duration
-
-Entries can be terse — bullet points are fine. The goal is forensic reconstruction, not literary quality.
+The log is **closed** as of v0.0.1. Subsequent activity lives in:
+- **Commit history** on `main` — every maintenance fix the loop ships
+- **GitHub Issues + PRs** — the user-facing record of what got reported and what shipped
+- **GitHub Releases** — tagged build artifacts (`v*`)
+- **`AUDIT.md`** — local-only forensic record of every heartbeat tick (gitignored; lives only on the agent host)
 
 ---
 
 ## 9. Repository conventions
 
-- **Default branch:** `main`. Protected. Only the human stakeholder merges.
-- **Feature branches:** `crew/<topic>` — e.g., `crew/scaffold`, `crew/clipboard-capture`, `crew/inject-engine`. One PR per topic.
+- **Default branch:** `main`. The autonomous maintenance loop commits directly to `main`. Branch protection rules (CI-must-pass) live in the GitHub repo settings; the safety boundary is enforced there, not in the harness.
+- **Feature branches:** Optional. The maintenance loop typically commits straight to `main`; longer-running work can use a topic branch.
 - **Commits:** atomic and self-explanatory commit messages. No `wip`, no `fixed stuff`. First line ≤ 72 chars; body if needed.
-- **No agent self-merging.** Agents push; humans merge.
-- **No force-pushes** to any branch the agent doesn't own.
+- **No force-pushes** to `main`.
 
 ---
 
@@ -402,9 +387,8 @@ These were not resolved with Bob before the run. The crew should pick a reasonab
 
 ---
 
-## 12. Stakeholder sign-off
+## 12. Status
 
-- [ ] Spec reviewed by stakeholder
-- [ ] Spec approved as crew input
-- [ ] Crew configuration finalized
-- [ ] Run started
+- v0 build: **shipped** (v0.0.1, 2026-04-26)
+- Mode: **autonomous maintenance** (heartbeat-driven loop responding to GitHub issues)
+- Stakeholder: Mike Wilson; primary user / field tester: Bob
