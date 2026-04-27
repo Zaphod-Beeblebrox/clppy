@@ -121,15 +121,28 @@ public class ClipboardCaptureService : IClipboardCapture, IDisposable
                     if (rtf != null && rtf.Length > 0)
                         clip.Rtf = rtf;
                 }
+                else if (format == CF_HTML)
+                {
+                    var html = GetClipboardHtml();
+                    if (!string.IsNullOrEmpty(html))
+                        clip.Html = Encoding.UTF8.GetBytes(html);
+                }
             }
 
             CloseClipboard();
 
             if (!string.IsNullOrEmpty(clip.PlainText) || clip.Rtf != null || clip.Html != null)
             {
-                _ = _clipRepository.AddAsync(clip);
-                _historyBuffer.Add(clip);
-                ClipCaptured?.Invoke(clip);
+                try
+                {
+                    _clipRepository.AddAsync(clip).GetAwaiter().GetResult();
+                    _historyBuffer.Add(clip);
+                    ClipCaptured?.Invoke(clip);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to save clip: {ex.Message}");
+                }
             }
         }
         catch
@@ -198,6 +211,27 @@ public class ClipboardCaptureService : IClipboardCapture, IDisposable
         }
     }
 
+    private string? GetClipboardHtml()
+    {
+        var htmlFormat = RegisterClipboardFormat("HTML Format");
+        if (htmlFormat == 0) return null;
+
+        var handle = GetClipboardData(htmlFormat);
+        if (handle == IntPtr.Zero) return null;
+
+        var ptr = GlobalLock(handle);
+        if (ptr == IntPtr.Zero) return null;
+
+        try
+        {
+            return Marshal.PtrToStringUni(ptr);
+        }
+        finally
+        {
+            GlobalUnlock(handle);
+        }
+    }
+
     private string GetLabelFromText(string text)
     {
         var firstLine = text.Split('\n')[0].Replace("\r", "");
@@ -217,6 +251,7 @@ public class ClipboardCaptureService : IClipboardCapture, IDisposable
     private const int CF_UNICODETEXT = 13;
     private const int CF_OEMTEXT = 7;
     private const int CF_RTF = 0x00CF;
+    private const int CF_HTML = 0x04D2;
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -253,12 +288,12 @@ public class ClipboardCaptureService : IClipboardCapture, IDisposable
         public IntPtr hInstance;
         public IntPtr hIcon;
         public IntPtr hCursor;
+        public IntPtr hIconSm;
         public IntPtr hbrBackground;
         [MarshalAs(UnmanagedType.LPTStr)]
         public string? lpszMenuName;
         [MarshalAs(UnmanagedType.LPTStr)]
         public string lpszClassName;
-        public IntPtr hIconSm;
     }
 
     [DllImport("user32.dll", SetLastError = true)]
