@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Clppy.Core.Clipboard;
 using Clppy.Core.Hotkeys;
+using Clppy.Core.Logging;
 using Clppy.Core.Models;
 using Clppy.Core.Paste;
 using Clppy.Core.Persistence;
@@ -21,6 +22,7 @@ public static class DependencyInjection
             options.UseSqlite($"Data Source={dbPath}"));
 
         // Services
+        services.AddSingleton<IFileLogger, FileLogger>();
         services.AddSingleton<IClipRepository, ClipRepository>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IClipboardCapture, ClipboardCaptureService>();
