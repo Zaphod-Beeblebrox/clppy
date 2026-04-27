@@ -50,11 +50,17 @@ packages/
 .env
 .env.local
 
-# Agent loop's internal action journal — local/forensic only.
+# Agent loop's internal action/forensic files — local only.
 # Public-facing record of agent behavior is the commit history + issue
-# comments. PROGRESS.md contains raw reasoning chains, command outputs,
+# comments. These files contain raw reasoning chains, command outputs,
 # and LAN-internal references that don't belong in the public repo.
+# - AUDIT.md: append-only forensic record (full history)
+# - PROGRESS.md: working-memory tail (regenerated each tick)
+# - *.archive.md: frozen snapshots of prior journal phases
+AUDIT.md
+AUDIT.*.md
 PROGRESS.md
+PROGRESS.*.md
 
 # OS files
 .DS_Store
