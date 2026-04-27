@@ -52,128 +52,185 @@ public partial class MainWindow : Window
 
         _clipboardCapture.ClipCaptured += OnClipCaptured;
         _hotkeyService.HotkeyTriggered += OnHotkeyTriggered;
-        _clipboardCapture.StartListening();
+        
+        try
+        {
+            _clipboardCapture.StartListening();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to start clipboard capture: {ex.Message}\n\nClipboard monitoring will not work.", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
 
         _ = LoadClipsAsync();
     }
 
     private async Task LoadClipsAsync()
     {
-        Clips.Clear();
-
-        await _settingsService.LoadAsync();
-        var settings = _settingsService.Current;
-        var historyRows = settings.HistoryRows;
-        var historyCols = settings.HistoryCols;
-        var totalRows = 30;
-        var totalCols = 9;
-
-        var allClips = await _clipRepository.GetAllAsync();
-        var pinnedClips = allClips.Where(c => c.Pinned && c.Row.HasValue && c.Col.HasValue).ToList();
-        var historyClips = allClips.Where(c => !c.Pinned).OrderBy(c => c.HistoryIndex).ToList();
-
-        for (int row = 0; row < totalRows; row++)
+        try
         {
-            for (int col = 0; col < totalCols; col++)
+            Clips.Clear();
+
+            await _settingsService.LoadAsync();
+            var settings = _settingsService.Current;
+            var historyRows = settings.HistoryRows;
+            var historyCols = settings.HistoryCols;
+            var totalRows = 30;
+            var totalCols = 9;
+
+            var allClips = await _clipRepository.GetAllAsync();
+            var pinnedClips = allClips.Where(c => c.Pinned && c.Row.HasValue && c.Col.HasValue).ToList();
+            var historyClips = allClips.Where(c => !c.Pinned).OrderBy(c => c.HistoryIndex).ToList();
+
+            for (int row = 0; row < totalRows; row++)
             {
-                var clip = pinnedClips.FirstOrDefault(c => c.Row == row && c.Col == col);
-                var isInHistory = row < historyRows && col < historyCols;
-                
-                if (clip == null && isInHistory)
+                for (int col = 0; col < totalCols; col++)
                 {
-                    var historyIndex = historyClips.Count - 1 - Math.Min(historyClips.Count - 1, row * historyCols + col);
-                    if (historyIndex >= 0 && historyIndex < historyClips.Count)
+                    var clip = pinnedClips.FirstOrDefault(c => c.Row == row && c.Col == col);
+                    var isInHistory = row < historyRows && col < historyCols;
+                    
+                    if (clip == null && isInHistory)
                     {
-                        clip = historyClips[historyIndex];
+                        var historyIndex = historyClips.Count - 1 - Math.Min(historyClips.Count - 1, row * historyCols + col);
+                        if (historyIndex >= 0 && historyIndex < historyClips.Count)
+                        {
+                            clip = historyClips[historyIndex];
+                        }
+                    }
+
+                    if (clip != null)
+                    {
+                        Clips.Add(new ClipCellViewModel(clip, isInHistory, settings));
+                    }
+                    else
+                    {
+                        Clips.Add(new ClipCellViewModel(null, isInHistory, settings));
                     }
                 }
-
-                if (clip != null)
-                {
-                    Clips.Add(new ClipCellViewModel(clip, isInHistory, settings));
-                }
-                else
-                {
-                    Clips.Add(new ClipCellViewModel(null, isInHistory, settings));
-                }
             }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load clips: {ex.Message}\n\nPlease check that the database is accessible.", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void OnClipCaptured(Clip clip)
     {
-        Dispatcher.Invoke(async () => await LoadClipsAsync());
+        try
+        {
+            Dispatcher.Invoke(async () => await LoadClipsAsync());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error processing captured clip: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OnHotkeyTriggered(Guid clipId)
     {
         Dispatcher.Invoke(async () =>
         {
-            var clip = await _clipRepository.GetByIdAsync(clipId);
-            if (clip != null)
+            try
             {
-                var engine = _pasteRouter.GetEngine(clip, false);
-                await engine.PasteAsync(clip, IntPtr.Zero);
+                var clip = await _clipRepository.GetByIdAsync(clipId);
+                if (clip != null)
+                {
+                    var engine = _pasteRouter.GetEngine(clip, false);
+                    await engine.PasteAsync(clip, IntPtr.Zero);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Hotkey paste failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         });
     }
 
     private void ClipCell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        var vm = (ClipCellViewModel)((Border)sender).DataContext;
-        if (vm.Clip == null) return;
-
-        if (e.ClickCount == 2)
+        try
         {
-            var editor = new ClipEditorWindow(vm.Clip, _clipRepository, _hotkeyService);
-            if (editor.ShowDialog() == true && editor.ResultClip != null)
-            {
-                _ = _clipRepository.UpdateAsync(editor.ResultClip);
-                _ = LoadClipsAsync();
-            }
-            return;
-        }
+            var vm = (ClipCellViewModel)((Border)sender).DataContext;
+            if (vm.Clip == null) return;
 
-        var useOverride = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        var engine = _pasteRouter.GetEngine(vm.Clip, useOverride);
-        _ = engine.PasteAsync(vm.Clip, IntPtr.Zero);
+            if (e.ClickCount == 2)
+            {
+                var editor = new ClipEditorWindow(vm.Clip, _clipRepository, _hotkeyService);
+                if (editor.ShowDialog() == true && editor.ResultClip != null)
+                {
+                    _ = _clipRepository.UpdateAsync(editor.ResultClip);
+                    _ = LoadClipsAsync();
+                }
+                return;
+            }
+
+            var useOverride = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+            var engine = _pasteRouter.GetEngine(vm.Clip, useOverride);
+            _ = engine.PasteAsync(vm.Clip, IntPtr.Zero);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Click action failed: {ex.Message}\n\nThis could be due to a paste engine issue or window focus problem.", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void ClipCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var vm = (ClipCellViewModel)((Border)sender).DataContext;
-        if (vm.Clip != null)
+        try
         {
-            _draggedClip = vm.Clip;
-            _dragStartPoint = e.GetPosition(this);
+            var vm = (ClipCellViewModel)((Border)sender).DataContext;
+            if (vm.Clip != null)
+            {
+                _draggedClip = vm.Clip;
+                _dragStartPoint = e.GetPosition(this);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Drag start failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void ClipCell_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_draggedClip != null && e.LeftButton == MouseButtonState.Pressed)
+        try
         {
-            var position = e.GetPosition(this);
-            var diff = _dragStartPoint - position;
-            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            if (_draggedClip != null && e.LeftButton == MouseButtonState.Pressed)
             {
-                var data = new DataObject("ClipId", _draggedClip.Id.ToString());
-                DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
-                _draggedClip = null;
+                var position = e.GetPosition(this);
+                var diff = _dragStartPoint - position;
+                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                {
+                    var data = new DataObject("ClipId", _draggedClip.Id.ToString());
+                    DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
+                    _draggedClip = null;
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Drag operation failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void ClipCell_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent("ClipId") && sender is Border border)
+        try
         {
-            var vm = (ClipCellViewModel)border.DataContext;
-            var clipId = Guid.Parse(e.Data.GetData("ClipId")!.ToString()!);
-            
-            _ = _clipRepository.UpdateClipPositionAsync(clipId, vm.Row, vm.Col);
-            _ = LoadClipsAsync();
+            if (e.Data.GetDataPresent("ClipId") && sender is Border border)
+            {
+                var vm = (ClipCellViewModel)border.DataContext;
+                var clipId = Guid.Parse(e.Data.GetData("ClipId")!.ToString()!);
+                
+                _ = _clipRepository.UpdateClipPositionAsync(clipId, vm.Row, vm.Col);
+                _ = LoadClipsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Drop operation failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -185,11 +242,18 @@ public partial class MainWindow : Window
 
     private void ClipCell_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
-        var vm = (ClipCellViewModel)((Border)sender).DataContext;
-        if (vm.Clip != null)
+        try
         {
-            var contextMenu = CreateClipContextMenu(vm.Clip);
-            contextMenu.IsOpen = true;
+            var vm = (ClipCellViewModel)((Border)sender).DataContext;
+            if (vm.Clip != null)
+            {
+                var contextMenu = CreateClipContextMenu(vm.Clip);
+                contextMenu.IsOpen = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Context menu failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -201,8 +265,15 @@ public partial class MainWindow : Window
         var pasteItem = new MenuItem { Header = "Paste" };
         pasteItem.Click += async (s, e) =>
         {
-            var engine = _pasteRouter.GetEngine(clip, false);
-            await engine.PasteAsync(clip, IntPtr.Zero);
+            try
+            {
+                var engine = _pasteRouter.GetEngine(clip, false);
+                await engine.PasteAsync(clip, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Paste failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         menu.Items.Add(pasteItem);
 
@@ -210,9 +281,16 @@ public partial class MainWindow : Window
         var pasteAsTextItem = new MenuItem { Header = "Paste as text" };
         pasteAsTextItem.Click += async (s, e) =>
         {
-            var tempClip = new Clip { PlainText = clip.PlainText, Method = PasteMethod.Direct };
-            var engine = _pasteRouter.GetEngine(tempClip, false);
-            await engine.PasteAsync(tempClip, IntPtr.Zero);
+            try
+            {
+                var tempClip = new Clip { PlainText = clip.PlainText, Method = PasteMethod.Direct };
+                var engine = _pasteRouter.GetEngine(tempClip, false);
+                await engine.PasteAsync(tempClip, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Paste as text failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         menu.Items.Add(pasteAsTextItem);
 
@@ -220,8 +298,15 @@ public partial class MainWindow : Window
         var pasteAsKeystrokesItem = new MenuItem { Header = "Paste as keystrokes" };
         pasteAsKeystrokesItem.Click += async (s, e) =>
         {
-            var engine = _pasteRouter.GetEngine(clip, true);
-            await engine.PasteAsync(clip, IntPtr.Zero);
+            try
+            {
+                var engine = _pasteRouter.GetEngine(clip, true);
+                await engine.PasteAsync(clip, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Paste as keystrokes failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         menu.Items.Add(pasteAsKeystrokesItem);
 
@@ -231,11 +316,18 @@ public partial class MainWindow : Window
         var editItem = new MenuItem { Header = "Edit..." };
         editItem.Click += (s, e) =>
         {
-            var editor = new ClipEditorWindow(clip, _clipRepository, _hotkeyService);
-            if (editor.ShowDialog() == true && editor.ResultClip != null)
+            try
             {
-                _ = _clipRepository.UpdateAsync(editor.ResultClip);
-                _ = LoadClipsAsync();
+                var editor = new ClipEditorWindow(clip, _clipRepository, _hotkeyService);
+                if (editor.ShowDialog() == true && editor.ResultClip != null)
+                {
+                    _ = _clipRepository.UpdateAsync(editor.ResultClip);
+                    _ = LoadClipsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Edit failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         };
         menu.Items.Add(editItem);
@@ -244,24 +336,31 @@ public partial class MainWindow : Window
         var renameItem = new MenuItem { Header = "Rename..." };
         renameItem.Click += (s, e) =>
         {
-            var dialog = new Window
+            try
             {
-                Title = "Rename Clip",
-                Width = 300,
-                Height = 150,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Content = new StackPanel { Margin = new Thickness(10), Children = {
-                    new TextBox { Name = "RenameTextBox", Margin = new Thickness(0,0,0,10), Text = clip.Label ?? "" },
-                    new Button { Content = "OK", Width = 70, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,10,0,0) }
-                }}
-            };
-            dialog.Loaded += (s2, e2) => ((TextBox)dialog.FindName("RenameTextBox")).Focus();
-            if (dialog.ShowDialog() == true)
+                var dialog = new Window
+                {
+                    Title = "Rename Clip",
+                    Width = 300,
+                    Height = 150,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Content = new StackPanel { Margin = new Thickness(10), Children = {
+                        new TextBox { Name = "RenameTextBox", Margin = new Thickness(0,0,0,10), Text = clip.Label ?? "" },
+                        new Button { Content = "OK", Width = 70, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,10,0,0) }
+                    }}
+                };
+                dialog.Loaded += (s2, e2) => ((TextBox)dialog.FindName("RenameTextBox")).Focus();
+                if (dialog.ShowDialog() == true)
+                {
+                    var textBox = (TextBox)dialog.FindName("RenameTextBox");
+                    clip.Label = textBox.Text;
+                    _ = _clipRepository.UpdateAsync(clip);
+                    _ = LoadClipsAsync();
+                }
+            }
+            catch (Exception ex)
             {
-                var textBox = (TextBox)dialog.FindName("RenameTextBox");
-                clip.Label = textBox.Text;
-                _ = _clipRepository.UpdateAsync(clip);
-                _ = LoadClipsAsync();
+                MessageBox.Show($"Rename failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         };
         menu.Items.Add(renameItem);
@@ -270,12 +369,19 @@ public partial class MainWindow : Window
         var setColorItem = new MenuItem { Header = "Set color..." };
         setColorItem.Click += (s, e) =>
         {
-            var dialog = new ColorPickerDialog();
-            if (dialog.ShowDialog() == true && dialog.SelectedColor.HasValue)
+            try
             {
-                clip.ColorHex = dialog.SelectedColor.Value.ToString();
-                _ = _clipRepository.UpdateAsync(clip);
-                _ = LoadClipsAsync();
+                var dialog = new ColorPickerDialog();
+                if (dialog.ShowDialog() == true && dialog.SelectedColor.HasValue)
+                {
+                    clip.ColorHex = dialog.SelectedColor.Value.ToString();
+                    _ = _clipRepository.UpdateAsync(clip);
+                    _ = LoadClipsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Set color failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         };
         menu.Items.Add(setColorItem);
@@ -284,11 +390,18 @@ public partial class MainWindow : Window
         var setHotkeyItem = new MenuItem { Header = "Set hotkey..." };
         setHotkeyItem.Click += (s, e) =>
         {
-            var editor = new ClipEditorWindow(clip, _clipRepository, _hotkeyService);
-            if (editor.ShowDialog() == true && editor.ResultClip != null)
+            try
             {
-                _ = _clipRepository.UpdateAsync(editor.ResultClip);
-                _ = LoadClipsAsync();
+                var editor = new ClipEditorWindow(clip, _clipRepository, _hotkeyService);
+                if (editor.ShowDialog() == true && editor.ResultClip != null)
+                {
+                    _ = _clipRepository.UpdateAsync(editor.ResultClip);
+                    _ = LoadClipsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Set hotkey failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         };
         menu.Items.Add(setHotkeyItem);
@@ -299,15 +412,29 @@ public partial class MainWindow : Window
         var injectMethodItem = new MenuItem { Header = "Inject (⌨)", IsCheckable = true, IsChecked = clip.Method == PasteMethod.Inject };
         directMethodItem.Click += async (s, e) =>
         {
-            clip.Method = PasteMethod.Direct;
-            await _clipRepository.UpdateAsync(clip);
-            _ = LoadClipsAsync();
+            try
+            {
+                clip.Method = PasteMethod.Direct;
+                await _clipRepository.UpdateAsync(clip);
+                _ = LoadClipsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Set paste method failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         injectMethodItem.Click += async (s, e) =>
         {
-            clip.Method = PasteMethod.Inject;
-            await _clipRepository.UpdateAsync(clip);
-            _ = LoadClipsAsync();
+            try
+            {
+                clip.Method = PasteMethod.Inject;
+                await _clipRepository.UpdateAsync(clip);
+                _ = LoadClipsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Set paste method failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         setMethodItem.Items.Add(directMethodItem);
         setMethodItem.Items.Add(injectMethodItem);
@@ -319,8 +446,15 @@ public partial class MainWindow : Window
         var moveToHistoryItem = new MenuItem { Header = "Move to history zone" };
         moveToHistoryItem.Click += async (s, e) =>
         {
-            await _clipRepository.UpdateClipPositionAsync(clip.Id, 0, 0);
-            _ = LoadClipsAsync();
+            try
+            {
+                await _clipRepository.UpdateClipPositionAsync(clip.Id, 0, 0);
+                _ = LoadClipsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Move to history failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         menu.Items.Add(moveToHistoryItem);
 
@@ -328,8 +462,15 @@ public partial class MainWindow : Window
         var deleteItem = new MenuItem { Header = "Delete" };
         deleteItem.Click += async (s, e) =>
         {
-            await _clipRepository.DeleteAsync(clip.Id);
-            _ = LoadClipsAsync();
+            try
+            {
+                await _clipRepository.DeleteAsync(clip.Id);
+                _ = LoadClipsAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Delete failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
         menu.Items.Add(deleteItem);
 
@@ -366,10 +507,17 @@ public partial class MainWindow : Window
 
     private void FilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        var filterText = FilterTextBox.Text.ToLower();
-        foreach (var clip in Clips)
+        try
         {
-            clip.UpdateOpacity(filterText);
+            var filterText = FilterTextBox.Text.ToLower();
+            foreach (var clip in Clips)
+            {
+                clip.UpdateOpacity(filterText);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Filter failed: {ex.Message}", "Clppy Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
