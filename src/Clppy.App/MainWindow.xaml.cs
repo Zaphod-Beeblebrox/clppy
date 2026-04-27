@@ -94,7 +94,7 @@ public partial class MainWindow : Window
             _logger.Log($"LoadClipsAsync: Settings loaded - HistoryRows={historyRows}, HistoryCols={historyCols}");
             
             var allClips = await _clipRepository.GetAllAsync();
-            _logger.Log($"LoadClipsAsync: Retrieved {allClips.Count} clips from database");
+            _logger.Log($"LoadClipsAsync: Retrieved {allClips.Count()} clips from database");
             
             var pinnedClips = allClips.Where(c => c.Pinned && c.Row.HasValue && c.Col.HasValue).ToList();
             var historyClips = allClips.Where(c => !c.Pinned).OrderBy(c => c.HistoryIndex).ToList();
